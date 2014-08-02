@@ -5,6 +5,8 @@ orient the object freely by dragging in any direction on the arcball, or by
 dragging along a constraint axis.
 
 + Press `F1` to toggle helpers.
++ Press `+` to increase size of helpers.
++ Press `-` to decrease size of helpers.
 + Press `R` to reset object orientation.
 + Hold `CTRL` to show body constraint axes.
 + Hold `SHIFT` to show camera constraint axes.
