@@ -4,6 +4,11 @@ Allows the user to interact with the orientation of an object. The user can
 orient the object freely by dragging in any direction on the arcball, or by
 dragging along a constraint axis.
 
++ Press `F1` to toggle helpers.
++ Hold `CTRL` to show body constraint axes.
++ Hold `SHIFT` to show camera constraint axes.
++ Hold `CTRL` and `SHIFT` to show world constraint axes.
+
 License
 -------
 Licensed under GNU GPL v3.0.
