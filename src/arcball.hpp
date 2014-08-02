@@ -7,8 +7,6 @@
 #include "window.hpp"
 #include "worldobject.hpp"
 
-#include "lib/glm.hpp"
-
 enum class AxisSet {
     NONE,
     CAMERA,

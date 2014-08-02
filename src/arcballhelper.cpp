@@ -1,6 +1,5 @@
 #include "arcballhelper.hpp"
 
-
 ArcballHelper::ArcballHelper()
     : show_drag(true),
       show_constraints(true),
