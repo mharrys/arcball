@@ -16,6 +16,10 @@ License
 -------
 Licensed under GNU GPL v3.0.
 
+Demo
+----
+Click [here](https://raw.githubusercontent.com/mharrys/arcball/master/demo.webm) for a video demonstration.
+
 How-to
 ------
 You will need a C++11 compiler, GLM, GLEW and SDL2. Consult SConstruct for
