@@ -438,10 +438,8 @@ void Window::poll(Input & input)
         case SDL_MOUSEMOTION:
             input.mouse.position.x = event.motion.x;
             input.mouse.position.y = event.motion.y;
-            if (pointer_lock) {
-                input.mouse.position_rel.x += event.motion.xrel;
-                input.mouse.position_rel.y += event.motion.yrel;
-            }
+            input.mouse.position_rel.x += event.motion.xrel;
+            input.mouse.position_rel.y += event.motion.yrel;
             break;
         case SDL_MOUSEWHEEL:
             input.mouse.scroll_delta += event.wheel.y;
