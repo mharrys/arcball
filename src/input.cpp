@@ -99,6 +99,9 @@ void Input::update()
 
     mouse.scroll_delta = 0;
 
+    mouse.position_rel.x = 0;
+    mouse.position_rel.y = 0;
+
     for (unsigned int i = 0; i < keyboard.keys.size(); i++) {
         State state = keyboard.keys[i];
 
