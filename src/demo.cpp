@@ -73,6 +73,8 @@ bool Demo::create(std::shared_ptr<Window> window)
 
 void Demo::update(seconds, seconds, Input & input)
 {
+    update_dimension();
+
     if (light_program.is_modified()) {
         light_program.reload();
     }
@@ -89,16 +91,6 @@ void Demo::update(seconds, seconds, Input & input)
     helper.update();
 
     model->update_world_transform();
-
-    auto dimension = window->dimension();
-    if (width != dimension.first || height != dimension.second) {
-        width = dimension.first;
-        height = dimension.second;
-
-        glViewport(0, 0, width, height);
-
-        camera->aspect_ratio = width / static_cast<float>(height);
-    }
 }
 
 void Demo::render()
@@ -113,6 +105,19 @@ void Demo::render()
 
 void Demo::destroy()
 {
+}
+
+void Demo::update_dimension()
+{
+    auto dimension = window->dimension();
+    if (width != dimension.first || height != dimension.second) {
+        width = dimension.first;
+        height = dimension.second;
+
+        glViewport(0, 0, width, height);
+
+        camera->aspect_ratio = width / static_cast<float>(height);
+    }
 }
 
 void Demo::render_model()

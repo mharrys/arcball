@@ -17,6 +17,8 @@ public:
     void render();
     void destroy();
 private:
+    void update_dimension();
+
     void render_model();
     void render_axes();
     void render_helper();
