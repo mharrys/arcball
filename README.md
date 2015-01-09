@@ -18,8 +18,12 @@ Screenshot
 
 How-to
 ------
-You will need a C++11 compiler, GLM, GLEW and SDL2. Consult SConstruct for
-details.
+This project depends on [gust](https://github.com/mharrys/gust), see its
+project page for details on dependencies.
+
+Recursive clone required
+
+    $ git clone --recursive <repository>
 
 Build and run
 
