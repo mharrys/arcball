@@ -3,43 +3,49 @@
 
 #include "arcball.hpp"
 #include "arcballhelper.hpp"
+#include "assets.hpp"
+#include "cameranode.hpp"
+#include "effectcomposer.hpp"
+#include "effectcomposerfactory.hpp"
+#include "firstpersoncontrol.hpp"
+#include "groupnode.hpp"
+#include "input.hpp"
+#include "lightnode.hpp"
+#include "logger.hpp"
 #include "mesh.hpp"
+#include "meshfactory.hpp"
+#include "model.hpp"
+#include "modelnode.hpp"
 #include "orthocamera.hpp"
+#include "pass.hpp"
 #include "perspectivecamera.hpp"
-#include "program.hpp"
+#include "pointlight.hpp"
+#include "renderer.hpp"
+#include "renderstate.hpp"
+#include "scene.hpp"
+#include "surfacepool.hpp"
+#include "window.hpp"
 #include "world.hpp"
 
-class Demo : public World {
+class Demo : public gst::World {
 public:
-    Demo();
-    bool create(std::shared_ptr<Window> window);
-    void update(seconds delta, seconds elapsed, Input & input);
-    void render();
-    void destroy();
+    Demo(std::shared_ptr<gst::Logger> logger, gst::Window window);
+    bool create() override;
+    void update(gst::seconds delta, gst::seconds elapsed);
 private:
-    void update_dimension();
+    void create_arcball(gst::SurfacePool & surfaces);
+    void create_axes(gst::SurfacePool & surfaces);
+    void create_lights();
 
-    void render_model();
-    void render_axes();
-    void render_helper();
+    std::shared_ptr<gst::Logger> logger;
+    gst::Window window;
 
-    std::shared_ptr<Window> window;
-    int width;
-    int height;
+    std::shared_ptr<gst::RenderState> render_state;
+    gst::Renderer renderer;
+    gst::Scene scene;
 
-    Program light_program;
-    Program basic_program;
-
-    std::shared_ptr<PerspectiveCamera> camera;
     std::shared_ptr<Arcball> arcball;
-    std::shared_ptr<WorldObject> model;
-
-    glm::vec4 light_direction;
-
-    ArcballHelper helper;
-    OrthoCamera helper_camera;
-
-    Mesh axes;
+    std::shared_ptr<ArcballHelper> arcball_helper;
 
     bool show_helpers;
 };
