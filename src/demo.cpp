@@ -1,167 +1,141 @@
 #include "demo.hpp"
 
-#include "objloader.hpp"
-
-#include "lib/gl.hpp"
-
-#include <iostream>
-
-Demo::Demo()
-    : light_program("assets/shaders/light.vert", "assets/shaders/light.frag"),
-      basic_program("assets/shaders/basic.vert", "assets/shaders/basic.frag"),
-      light_direction(0.0f, 1.0f, 1.0f, 0.0f),
-      helper_camera(-1.0f, 1.0f, -1.0f, 1.0f),
+Demo::Demo(std::shared_ptr<gst::Logger> logger, gst::Window window)
+    : logger(logger),
+      window(window),
       show_helpers(true)
 {
 }
 
-bool Demo::create(std::shared_ptr<Window> window)
+bool Demo::create()
 {
-    this->window = window;
+    const auto size = window.get_size();
 
-    if (!light_program.is_valid()) {
-        std::cerr << "Demo::on_create: light program is invalid." << std::endl;
-        return false;
-    }
+    render_state = std::make_shared<gst::RenderState>(size);
+    renderer = gst::Renderer(logger, render_state);
+    renderer.auto_clear = false;
 
-    if (!basic_program.is_valid()) {
-        std::cerr << "Demo::on_create: basic program is invalid." << std::endl;
-        return false;
-    }
+    auto aspect_ratio = size.get_width() / static_cast<float>(size.get_height());
+    auto camera = std::make_shared<gst::PerspectiveCamera>(
+        45.0f,
+        aspect_ratio,
+        0.1f,
+        1000.0f
+    );
+    scene = gst::Scene(camera);
+    scene.eye->rotate_x(-30.0f);
+    scene.eye->rotate_y(20.0f);
+    scene.eye->translate_z(4.2f);
 
-    model = OBJLoader::load("assets/models/suzanne.obj");
-    if (!model) {
-        std::cerr << "Demo::on_create: unable to load model." << std::endl;
-        return false;
-    }
-    model->update_world_transform();
+    gst::ProgramFactory program_factory(logger);
+    gst::ProgramPool programs(program_factory);
+    gst::SurfacePool surfaces(programs);
 
-    camera = std::make_shared<PerspectiveCamera>();
-    camera->rotate_x(-45.0f);
-    camera->rotate_y(15.0f);
-    camera->translate_z(40.0f);
-    camera->update_world_transform();
-
-    arcball = std::make_shared<Arcball>(model, camera, window);
-    arcball->allow_constraints = true;
-
-    helper.target(arcball);
-    helper.show_result = false;
-
-    axes.mode = DrawMode::LINES;
-    axes.opacity = 0.3f;
-    axes.color = glm::vec3(0.5f, 0.5f, 1.0f);
-    axes.use_color = true;
-    axes.positions.push_back(glm::vec3(-50.0f, 0.0f, 0.0f)); // x
-    axes.positions.push_back(glm::vec3(50.0f, 0.0f, 0.0f));
-    axes.positions.push_back(glm::vec3(0.0f, -50.0f, 0.0f)); // y
-    axes.positions.push_back(glm::vec3(0.0f, 50.0f, 0.0f));
-    axes.positions.push_back(glm::vec3(0.0f, 0.0f, -50.0f)); // z
-    axes.positions.push_back(glm::vec3(0.0f, 0.0f, 50.0f));
-    axes.update_positions = true;
-
-    glEnable(GL_DEPTH_TEST);
-
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    create_arcball(surfaces);
+    create_axes(surfaces);
+    create_lights();
 
     return true;
 }
 
-void Demo::update(seconds, seconds, Input & input)
+void Demo::update(gst::seconds, gst::seconds)
 {
-    update_dimension();
+    auto input = window.get_input();
 
-    if (light_program.is_modified()) {
-        light_program.reload();
-    }
-
-    if (basic_program.is_modified()) {
-        basic_program.reload();
-    }
-
-    if (input.pressed(Key::F1)) {
+    if (input.pressed(gst::Key::F1)) {
         show_helpers = !show_helpers;
     }
 
     arcball->update(input);
-    helper.update();
+    scene.update();
 
-    model->update_world_transform();
-}
-
-void Demo::render()
-{
-    render_model();
-
+    renderer.clear();
+    renderer.render(scene);
     if (show_helpers) {
-        render_axes();
-        render_helper();
+        arcball_helper->update();
+        arcball_helper->draw(renderer);
     }
+    renderer.check_errors();
 }
 
-void Demo::destroy()
+void Demo::create_arcball(gst::SurfacePool & surfaces)
 {
-}
+    gst::MeshFactory mesh_factory(logger, render_state);
 
-void Demo::update_dimension()
-{
-    auto dimension = window->dimension();
-    if (width != dimension.first || height != dimension.second) {
-        width = dimension.first;
-        height = dimension.second;
+    auto blinn_phong = surfaces.create_blinn_phong(BLINNPHONG_VS, BLINNPHONG_FS);
+    blinn_phong.cull_face = gst::CullFace::BACK;
+    blinn_phong.depth_test = true;
+    blinn_phong.material.specular = glm::vec3(1.0f);
+    blinn_phong.material.shininess = 21.0f;
 
-        glViewport(0, 0, width, height);
-
-        camera->aspect_ratio = width / static_cast<float>(height);
+    auto suzanne = std::make_shared<gst::GroupNode>();
+    for (auto mesh : mesh_factory.create_from_file(MODEL)) {
+        auto model = std::make_shared<gst::Model>(mesh, blinn_phong);
+        auto model_node = std::make_shared<gst::ModelNode>(model);
+        suzanne->add(model_node);
     }
+
+    arcball = std::make_shared<Arcball>(suzanne, scene.eye, window.get_size());
+    arcball->allow_constraints = true;
+    arcball_helper = std::make_shared<ArcballHelper>(surfaces, render_state);
+    arcball_helper->target(arcball);
+    arcball_helper->show_result = false;
+
+    scene.add(suzanne);
 }
 
-void Demo::render_model()
+void Demo::create_axes(gst::SurfacePool & surfaces)
 {
-    light_program.use();
+    auto basic_surface = surfaces.create_basic(BASIC_VS, BASIC_FS);
+    basic_surface.material.diffuse = glm::vec3(0.5f, 0.5f, 1.0f);
+    basic_surface.depth_test = true;
+    basic_surface.opacity = 0.3f;
+    basic_surface.blend_mode = gst::BlendMode::INTERPOLATIVE;
+    basic_surface.receive_light = false;
 
-    glm::mat4 m = model->world_transform();
-    glm::mat4 v = camera->view();
-    glm::mat4 p = camera->projection();
+    gst::VertexArray vertex_array(render_state);
+    gst::Mesh mesh(vertex_array);
+    mesh.mode = gst::DrawMode::LINES;
+    mesh.positions = {
+        render_state,
+        { gst::AttribIndex::POSITION, 3, gst::DataType::FLOAT }
+    };
+    mesh.positions.data = {
+        // x
+        glm::vec3(-50.0f, 0.0f, 0.0f),
+        glm::vec3(50.0f, 0.0f, 0.0f),
+        // y
+        glm::vec3(0.0f, -50.0f, 0.0f),
+        glm::vec3(0.0f, 50.0f, 0.0f),
+        // z
+        glm::vec3(0.0f, 0.0f, -50.0f),
+        glm::vec3(0.0f, 0.0f, 50.0f),
+    };
+    mesh.positions.buffer_data();
+    vertex_array.set(mesh.positions);
 
-    glm::mat4 mv = v * m;
-    glm::mat4 mvp = p * mv;
-    glm::mat3 nm = glm::inverseTranspose(glm::mat3(mv));
-
-    glm::vec4 light_direction_es = v * light_direction;
-
-    light_program.set_uniform("mv", mv);
-    light_program.set_uniform("mvp", mvp);
-    light_program.set_uniform("nm", nm);
-    light_program.set_uniform("light_position", light_direction_es);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    model->traverse([&](WorldObject & object) {
-        object.draw();
-    });
+    auto model = std::make_shared<gst::Model>(mesh, basic_surface);
+    scene.add(std::make_shared<gst::ModelNode>(model));
 }
 
-void Demo::render_axes()
+void Demo::create_lights()
 {
-    basic_program.use();
+    const gst::Attenuation attenuation(1.0f, 0.5f, 0.03f);
 
-    glm::mat4 v = camera->view();
-    glm::mat4 p = camera->projection();
-    glm::mat4 mvp = p * v;
+    auto light0 = std::make_shared<gst::PointLight>();
+    light0->diffuse = glm::vec3(0.0f, 0.0f, 1.0f);
+    light0->attenuation = attenuation;
 
-    basic_program.set_uniform("mvp", mvp);
-    basic_program.set_uniform("use_mesh_color", axes.use_color);
-    basic_program.set_uniform("mesh_color", axes.color);
-    basic_program.set_uniform("mesh_opacity", axes.opacity);
+    auto light1 = std::make_shared<gst::PointLight>();
+    light1->diffuse = glm::vec3(1.0f, 0.0f, 0.0f);
+    light1->attenuation = attenuation;
 
-    axes.draw();
-}
+    auto light_node0 = std::make_shared<gst::LightNode>(light0);
+    light_node0->position = glm::vec3(1.8f, 1.2f, 1.0f);
 
-void Demo::render_helper()
-{
-    helper.draw(basic_program, helper_camera);
+    auto light_node1 = std::make_shared<gst::LightNode>(light1);
+    light_node1->position = glm::vec3(-2.0f, 1.2f, 2.0f);
+
+    scene.add(light_node0);
+    scene.add(light_node1);
 }

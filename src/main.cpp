@@ -1,30 +1,19 @@
 #include "demo.hpp"
-#include "runner.hpp"
-
-#include <memory>
+#include "eventloop.hpp"
+#include "stdoutlogger.hpp"
+#include "window.hpp"
+#include "windowbuilder.hpp"
 
 int main()
 {
-    WindowSetting window_setting({
-        "Arcball Demo",
-        800, 600,
-        // resize
-        true,
-        // fullscreen
-        false,
-        // exit on close
-        true,
-        // exit on esc
-        true
-    });
-    auto window = std::make_shared<Window>(window_setting);
+    auto logger = std::make_shared<gst::StdoutLogger>();
 
-    if (window->is_open()) {
-        Demo demo;
+    gst::WindowBuilder builder(logger);
+    builder.set_title("Arcball");
 
-        Runner runner;
-        return runner.control(window, demo);
-    }
+    auto window = builder.build();
+    auto loop = gst::EventLoop();
+    auto demo = Demo(logger, window);
 
-    return 1;
+    return loop.control(window, demo);
 }
