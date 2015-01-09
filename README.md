@@ -18,7 +18,7 @@ Screenshot
 
 How-to
 ------
-This project depends on [gust](https://github.com/mharrys/gust), see its
+This project depends on [Gust](https://github.com/mharrys/gust), see its
 project page for details on dependencies.
 
 Recursive clone required
