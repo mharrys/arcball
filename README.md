@@ -12,10 +12,6 @@ dragging along a constraint axis.
 + Hold `SHIFT` to show camera constraint axes.
 + Hold `CTRL` and `SHIFT` to show world constraint axes.
 
-License
--------
-Licensed under GNU GPL v3.0.
-
 Screenshot
 ----------
 ![scrot](https://github.com/mharrys/arcball/raw/master/scrot.png)
