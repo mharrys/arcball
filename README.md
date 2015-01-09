@@ -16,9 +16,9 @@ License
 -------
 Licensed under GNU GPL v3.0.
 
-Demo
-----
-Click [here](https://github.com/mharrys/arcball/raw/master/demo.webm) for a video demonstration.
+Screenshot
+----------
+![scrot](https://github.com/mharrys/arcball/raw/master/scrot.png)
 
 How-to
 ------
