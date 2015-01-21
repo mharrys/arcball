@@ -14,8 +14,8 @@ Orientation::Orientation(glm::quat init)
 }
 
 Arcball::Arcball(
-    std::shared_ptr<gst::Node> object,
-    std::shared_ptr<gst::Node> camera,
+    std::shared_ptr<gst::Spatial> object,
+    std::shared_ptr<gst::Spatial> camera,
     gst::Viewport viewport)
     : allow_constraints(false),
       object(object),

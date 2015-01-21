@@ -2,8 +2,10 @@
 #define ARCBALL_HPP_INCLUDED
 
 #include "input.hpp"
-#include "node.hpp"
+#include "spatial.hpp"
 #include "viewport.hpp"
+
+#include <memory>
 
 class ArcballHelper;
 
@@ -39,8 +41,8 @@ class Arcball {
     friend ArcballHelper;
 public:
     Arcball(
-        std::shared_ptr<gst::Node> object,
-        std::shared_ptr<gst::Node> camera,
+        std::shared_ptr<gst::Spatial> object,
+        std::shared_ptr<gst::Spatial> camera,
         gst::Viewport viewport);
     void update(gst::Input & input);
 
@@ -57,8 +59,8 @@ private:
     glm::vec3 constrain_to(glm::vec3 point, glm::vec3 axis);
     int nearest_constraint(glm::vec3 ball_point);
 
-    std::shared_ptr<gst::Node> object;
-    std::shared_ptr<gst::Node> camera;
+    std::shared_ptr<gst::Spatial> object;
+    std::shared_ptr<gst::Spatial> camera;
     gst::Viewport viewport;
 
     float radius;
