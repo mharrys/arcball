@@ -1,8 +1,8 @@
 #version 130
 
-uniform mat4 mv;  // model-view matrix
-uniform mat4 mvp; // model-view-projection matrix
-uniform mat3 nm;  // normal matrix
+uniform mat4 model_view;
+uniform mat4 projection;
+uniform mat3 nm; // normal matrix
 
 in vec4 vertex_position;
 in vec3 vertex_normal;
@@ -12,7 +12,7 @@ out vec3 normal;
 
 void main()
 {
-    position = mv * vertex_position;
+    position = model_view * vertex_position;
     normal = nm * vertex_normal;
-    gl_Position = mvp * vertex_position;
+    gl_Position = projection * model_view * vertex_position;
 }

@@ -5,6 +5,7 @@
 #define BASIC_FS      "assets/shaders/basic.fs"
 #define BLINNPHONG_VS "assets/shaders/blinnphong.vs"
 #define BLINNPHONG_FS "assets/shaders/blinnphong.fs"
-#define MODEL         "assets/models/suzanne.obj"
+
+#define SUZANNE_OBJ "assets/models/suzanne.obj"
 
 #endif

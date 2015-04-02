@@ -1,55 +1,49 @@
 #include "arcball.hpp"
 
-Constraint::Constraint()
-    : current(AxisSet::NONE),
-      nearest(0)
-{
-}
-
-Orientation::Orientation(glm::quat init)
-    : reset(init),
-      start(init),
-      now(init)
-{
-}
-
-Arcball::Arcball(
-    std::shared_ptr<gst::Spatial> object,
-    std::shared_ptr<gst::Spatial> camera,
-    gst::Viewport viewport)
-    : allow_constraints(false),
-      object(object),
-      camera(camera),
-      viewport(viewport),
+Arcball::Arcball(std::shared_ptr<gst::Spatial> object)
+    : object(object),
+      allow_constraints(false),
       radius(0.75f),
-      dragging(false),
-      orientation(object->orientation)
+      dragging(false)
 {
+    constraint.current = AxisSet::NONE;
+    constraint.nearest = 0;
+    orientation.reset = object->orientation;
+    orientation.start = object->orientation;
+    orientation.now = object->orientation;
 }
 
-void Arcball::update(gst::Input & input)
+void Arcball::update(
+    gst::Input const & input,
+    gst::CameraNode const & eye,
+    gst::Viewport const & viewport)
 {
     update_button(input);
     update_key(input);
 
-    drag.from = ball_coord(mouse_position_start);
-    drag.to = ball_coord(input.position());
+    drag.from = ball_coord(viewport, mouse_position_start);
+    drag.to = ball_coord(viewport, input.position());
 
     if (!dragging) {
         update_current_axis_set(input);
-        update_constraint_axes();
+        update_constraint_axes(eye);
         constraint.nearest = nearest_constraint(drag.to);
     }
 
     if (dragging) {
-        update_drag_arc();
+        update_drag_arc(eye);
         object->orientation = orientation.now;
     }
 
     update_result_arc();
 }
 
-void Arcball::update_button(gst::Input & input)
+void Arcball::set_allow_constraints(bool allow_constraints)
+{
+    this->allow_constraints = allow_constraints;
+}
+
+void Arcball::update_button(gst::Input const & input)
 {
     const auto drag_button = gst::Button::LEFT;
 
@@ -64,7 +58,7 @@ void Arcball::update_button(gst::Input & input)
     }
 }
 
-void Arcball::update_key(gst::Input & input)
+void Arcball::update_key(gst::Input const & input)
 {
     if (input.pressed(gst::Key::PLUS)) {
         radius = glm::clamp(radius + 0.25f, 0.25f, 1.0f);
@@ -79,7 +73,7 @@ void Arcball::update_key(gst::Input & input)
     }
 }
 
-void Arcball::update_current_axis_set(gst::Input & input)
+void Arcball::update_current_axis_set(gst::Input const & input)
 {
     const bool shift = input.down(gst::Key::LSHIFT);
     const bool ctrl = input.down(gst::Key::LCTRL);
@@ -95,14 +89,14 @@ void Arcball::update_current_axis_set(gst::Input & input)
     }
 }
 
-void Arcball::update_constraint_axes()
+void Arcball::update_constraint_axes(gst::CameraNode const & eye)
 {
     constraint.available.clear();
 
     // the axes that should not rotate on camera axes is multiplied by the
     // inverse/conjugate of the camera orientation to cancel out the camera
     // orientation when dragging
-    glm::quat inv = glm::conjugate(camera->orientation);
+    glm::quat inv = glm::conjugate(eye.orientation);
 
     switch (constraint.current) {
     case AxisSet::BODY:
@@ -131,7 +125,7 @@ void Arcball::update_constraint_axes()
     }
 }
 
-void Arcball::update_drag_arc()
+void Arcball::update_drag_arc(gst::CameraNode const & eye)
 {
     if (constraint.current != AxisSet::NONE) {
         drag.from = constrain_to(drag.from, constraint.available[constraint.nearest]);
@@ -143,7 +137,7 @@ void Arcball::update_drag_arc()
     // initial point to the end point, the quaternion vector (or rotation
     // axis) is brought into eye space
     float w = glm::dot(drag.from, drag.to);
-    glm::vec3 v = camera->orientation * glm::cross(drag.from, drag.to);
+    glm::vec3 v = eye.orientation * glm::cross(drag.from, drag.to);
     glm::quat orientation_drag(w, v);
 
     // product of two quaternions give the combination of the rotations
@@ -183,9 +177,9 @@ void Arcball::update_result_arc()
 }
 
 // return coordinate on the ball from mouse position
-glm::vec3 Arcball::ball_coord(glm::ivec2 mouse_position)
+glm::vec3 Arcball::ball_coord(gst::Viewport const & viewport, glm::ivec2 mouse_position)
 {
-    glm::vec3 window_mouse_position = window_coord(mouse_position);
+    glm::vec3 window_mouse_position = window_coord(viewport, mouse_position);
 
     // TODO: center should be at the object position and in window coordinates
     glm::vec3 center = glm::vec3(0.0f);
@@ -204,7 +198,7 @@ glm::vec3 Arcball::ball_coord(glm::ivec2 mouse_position)
 }
 
 // return window coordinate from mouse position
-glm::vec3 Arcball::window_coord(glm::ivec2 mouse_position)
+glm::vec3 Arcball::window_coord(gst::Viewport const & viewport, glm::ivec2 mouse_position)
 {
     return glm::vec3(
         2.0f * (mouse_position.x - viewport.get_x()) / viewport.get_width() - 1.0f,

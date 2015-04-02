@@ -25,7 +25,6 @@ struct Light {
 
 const int MAX_LIGHTS = 2;
 
-uniform float opacity;
 uniform Material material;
 uniform Light point_lights[MAX_LIGHTS];
 
@@ -76,5 +75,5 @@ void main()
         color += material.emission;
     }
 
-    frag_color = vec4(color, opacity);
+    frag_color = vec4(color, 1.0);
 }

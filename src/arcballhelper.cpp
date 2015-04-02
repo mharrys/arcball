@@ -1,197 +1,240 @@
 #include "arcballhelper.hpp"
 
+#include "assets.hpp"
+
+ArcballHelper ArcballHelper::create(gst::ProgramPool & programs)
+{
+    auto camera = std::unique_ptr<gst::Camera>(new gst::OrthoCamera());
+    auto eye = std::make_shared<gst::CameraNode>(std::move(camera));
+
+    auto create_model_node = [&programs]()
+    {
+        auto basic_program = programs.create(BASIC_VS, BASIC_FS);
+        auto basic_pass = std::make_shared<gst::BasicPass>(basic_program);
+
+        auto vertex_array = std::make_shared<gst::VertexArrayImpl>();
+        auto mesh = gst::Mesh(vertex_array);
+        auto material = gst::Material::create_free();
+        auto model = gst::Model(mesh, material, basic_pass);
+
+        return std::make_shared<gst::ModelNode>(model);
+    };
+
+    auto result_node = create_model_node();
+    result_node->get_mesh().set_draw_mode(gst::DrawMode::LINE_STRIP);
+
+    auto rim_node = create_model_node();
+    rim_node->get_mesh().set_draw_mode(gst::DrawMode::LINE_LOOP);
+    rim_node->get_material().get_uniform("opacity") = 0.4f;
+    rim_node->get_pass().set_blend_mode(gst::BlendMode::INTERPOLATIVE);
+
+    auto drag_node = create_model_node();
+    drag_node->get_mesh().set_draw_mode(gst::DrawMode::LINE_STRIP);
+
+    ConstraintNodes constraint_nodes;
+    for (int i = 0; i < 3; i++) {
+        constraint_nodes[i] = create_model_node();
+        constraint_nodes[i]->get_mesh().set_draw_mode(gst::DrawMode::LINE_STRIP);
+        constraint_nodes[i]->get_pass().set_blend_mode(gst::BlendMode::INTERPOLATIVE);
+    }
+
+    return ArcballHelper(eye, drag_node, rim_node, result_node, constraint_nodes);
+}
+
 ArcballHelper::ArcballHelper(
-    gst::SurfacePool surfaces,
-    std::shared_ptr<gst::RenderState> render_state)
-    : show_drag(true),
+    std::shared_ptr<gst::CameraNode> eye,
+    std::shared_ptr<gst::ModelNode> drag_node,
+    std::shared_ptr<gst::ModelNode> rim_node,
+    std::shared_ptr<gst::ModelNode> result_node,
+    ConstraintNodes constraint_nodes)
+    : eye(eye),
+      drag_node(drag_node),
+      rim_node(rim_node),
+      result_node(result_node),
+      constraint_nodes(constraint_nodes),
+      show_drag(true),
       show_constraints(true),
       show_result(true),
       show_rim(true),
       override_rim(false)
 {
-    helpers = gst::Scene(std::make_shared<gst::OrthoCamera>());
-
-    auto create_model_node = [this, &surfaces, &render_state]()
-    {
-        auto surface = surfaces.create_basic(BASIC_VS, BASIC_FS);
-
-        gst::VertexArray vertex_array(render_state);
-        gst::Mesh mesh(vertex_array);
-        mesh.positions = {
-            render_state,
-            { gst::AttribIndex::POSITION, 3, gst::DataType::FLOAT }
-        };
-        vertex_array.set(mesh.positions);
-
-        auto model = std::make_shared<gst::Model>(mesh, surface);
-        auto model_node = std::make_shared<gst::ModelNode>(model);
-        helpers.add(model_node);
-
-        return model_node;
-    };
-
-    result_node = create_model_node();
-    result = result_node->model;
-    result->mesh.mode = gst::DrawMode::LINE_STRIP;
-
-    rim_node = create_model_node();
-    rim = rim_node->model;
-    rim->mesh.mode = gst::DrawMode::LINE_LOOP;
-    rim->surface.opacity = 0.4f;
-    rim->surface.blend_mode = gst::BlendMode::INTERPOLATIVE;
-
-    drag_node = create_model_node();
-    drag = drag_node->model;
-    drag->mesh.mode = gst::DrawMode::LINE_STRIP;
-
-    for (int i = 0; i < 3; i++) {
-        constraint_nodes[i] = create_model_node();
-        constraints[i] = constraint_nodes[i]->model;
-        constraints[i]->mesh.mode = gst::DrawMode::LINE_STRIP;
-        constraints[i]->surface.blend_mode = gst::BlendMode::INTERPOLATIVE;
-    }
 }
 
-void ArcballHelper::target(std::shared_ptr<Arcball> arcball)
+void ArcballHelper::update(Arcball const & arcball)
 {
-    this->arcball = arcball;
-}
+    update_drag(arcball);
+    update_constraints(arcball);
+    update_result(arcball);
+    update_rim(arcball);
 
-void ArcballHelper::update()
-{
-    if (!arcball) {
-        return;
+    helpers = gst::Scene(eye);
+
+    if (show_drag) {
+        helpers.add(drag_node);
     }
 
-    update_drag();
-    update_constraints();
-    update_result();
-    update_rim();
+    if (show_rim) {
+        helpers.add(rim_node);
+    }
+
+    if (show_result) {
+        helpers.add(result_node);
+    }
+
+    if (show_constraints) {
+        for (auto node : constraint_nodes) {
+            helpers.add(node);
+        }
+    }
 
     helpers.update();
 }
 
-void ArcballHelper::draw(gst::Renderer & renderer)
+void ArcballHelper::set_show_drag(bool show_drag)
 {
-    if (!arcball) {
-        return;
-    }
-
-    drag_node->enabled = show_drag;
-    rim_node->enabled = show_rim;
-    result_node->enabled = show_result;
-
-    for (auto node : constraint_nodes) {
-        node->enabled = show_constraints;
-    }
-
-    renderer.render(helpers);
+    this->show_drag = show_drag;
 }
 
-void ArcballHelper::update_drag()
+void ArcballHelper::set_show_constraints(bool show_constraints)
 {
-    drag->mesh.positions.data.clear();
+    this->show_constraints = show_constraints;
+}
 
-    if (arcball->dragging) {
+void ArcballHelper::set_show_result(bool show_result)
+{
+    this->show_result = show_result;
+}
+
+void ArcballHelper::set_show_rim(bool show_rim)
+{
+    this->show_rim = show_rim;
+}
+
+gst::Scene ArcballHelper::get_helpers() const
+{
+    return helpers;
+}
+
+void ArcballHelper::update_drag(Arcball const & arcball)
+{
+    std::vector<glm::vec3> positions;
+
+    if (arcball.dragging) {
         auto color = glm::vec3(1.0f, 1.0f, 0.0f);
         // set appropiate drag arc color depending on the constraint axis
-        if (arcball->constraint.current != AxisSet::NONE) {
-            color = axis_index_color(arcball->constraint.nearest);
+        if (arcball.constraint.current != AxisSet::NONE) {
+            color = axis_index_color(arcball.constraint.nearest);
         }
-        fill_arc(drag->mesh, arcball->drag.from, arcball->drag.to);
-        drag->surface.material.diffuse = color;
+        auto & material = drag_node->get_material();
+        material.get_uniform("diffuse") = color;
+
+        fill_arc(arcball, positions, arcball.drag.from, arcball.drag.to);
     }
 
-    drag->mesh.positions.buffer_data(gst::DataUsage::DYNAMIC);
+    auto & mesh = drag_node->get_mesh();
+    mesh.set_positions(positions);
 }
 
-void ArcballHelper::update_rim()
+void ArcballHelper::update_rim(Arcball const & arcball)
 {
-    rim->mesh.positions.data.clear();
+    std::vector<glm::vec3> positions;
 
     if (!override_rim) {
-        rim->surface.material.diffuse = glm::vec3(0.3f, 0.3f, 0.3f);
-        fill_circle(rim->mesh);
+        auto & material = rim_node->get_material();
+        material.get_uniform("diffuse") = glm::vec3(0.3f, 0.3f, 0.3f);
+        fill_circle(arcball, positions);
     }
 
-    rim->mesh.positions.buffer_data(gst::DataUsage::DYNAMIC);
+    auto & mesh = rim_node->get_mesh();
+    mesh.set_positions(positions);
 }
 
-void ArcballHelper::update_constraints()
+void ArcballHelper::update_constraints(Arcball const & arcball)
 {
-    for (auto constraint : constraints) {
-        constraint->mesh.positions.data.clear();
+    for (auto node : constraint_nodes) {
+        node->get_mesh().set_positions({});
     }
 
-    if (!arcball->allow_constraints) {
+    if (!arcball.allow_constraints) {
         return;
     }
 
     override_rim = false;
-    if (arcball->dragging) {
+    if (arcball.dragging) {
         // show only focus axis
-        if (arcball->constraint.current != AxisSet::NONE) {
-            fill_constraint(arcball->constraint.nearest);
+        if (arcball.constraint.current != AxisSet::NONE) {
+            fill_constraint(arcball, arcball.constraint.nearest);
             // we use points to "fill" the axis with the drag arc line
-            constraints[arcball->constraint.nearest]->mesh.mode = gst::DrawMode::POINTS;
+            auto & mesh = constraint_nodes[arcball.constraint.nearest]->get_mesh();
+            mesh.set_draw_mode(gst::DrawMode::POINTS);
         }
     } else {
         // show all available axes and highlight the nearest axis
-        if (arcball->constraint.current != AxisSet::NONE) {
-            for (unsigned int i = 0; i < arcball->constraint.available.size(); i++) {
-                fill_constraint(i);
+        if (arcball.constraint.current != AxisSet::NONE) {
+            for (unsigned int i = 0; i < arcball.constraint.available.size(); i++) {
+                fill_constraint(arcball, i);
             }
         }
     }
-
-    for (auto constraint : constraints) {
-        constraint->mesh.positions.buffer_data(gst::DataUsage::DYNAMIC);
-    }
 }
 
-void ArcballHelper::update_result()
+void ArcballHelper::update_result(Arcball const & arcball)
 {
-    result->mesh.positions.data.clear();
-    result->surface.material.diffuse = glm::vec3(1.0f, 0.5f, 0.0f);
-    fill_arc(result->mesh, arcball->result.from, arcball->result.to);
+    std::vector<glm::vec3> positions;
+    fill_arc(arcball, positions, arcball.result.from, arcball.result.to);
+
+    auto & material = result_node->get_material();
+    material.get_uniform("diffuse") = glm::vec3(1.0f, 0.5f, 0.0f);
+
+    auto & mesh = result_node->get_mesh();
+    mesh.set_positions(positions);
 }
 
-void ArcballHelper::fill_constraint(unsigned int index)
+void ArcballHelper::fill_constraint(Arcball const & arcball, unsigned int index)
 {
-    auto constraint = constraints[index];
-    constraint->mesh.mode = gst::DrawMode::LINE_STRIP;
-    constraint->surface.material.diffuse = axis_index_color(index);
-    constraint->surface.opacity = arcball->constraint.nearest == index ? 1.0f : 0.4f;
+    std::vector<glm::vec3> positions;
+    auto & mesh = constraint_nodes[index]->get_mesh();
+    auto & material = constraint_nodes[index]->get_material();
 
-    auto axis = arcball->constraint.available[index];
+    mesh.set_draw_mode(gst::DrawMode::LINE_STRIP);
+    material.get_uniform("diffuse") = axis_index_color(index);
+    material.get_uniform("opacity") = arcball.constraint.nearest == index ? 1.0f : 0.4f;
+
+    auto axis = arcball.constraint.available[index];
     if (axis.z == 1.0f) {
         // we are looking down through the z-axis
-        constraint->mesh.mode = gst::DrawMode::LINE_LOOP;
-        fill_circle(constraint->mesh);
+        mesh.set_draw_mode(gst::DrawMode::LINE_LOOP);
+        fill_circle(arcball, positions);
         // we signal to not draw our rim to avoid color conflicts when drawing
         override_rim = true;
     } else {
-        fill_half_arc(constraint->mesh, axis);
+        fill_half_arc(arcball, positions, axis);
     }
+
+    mesh.set_positions(positions);
 }
 
-void ArcballHelper::fill_circle(gst::Mesh & mesh)
+void ArcballHelper::fill_circle(Arcball const & arcball, std::vector<glm::vec3> & positions)
 {
-    const int segments = 64;
-    const float radius = arcball->radius;
-    const float PI_2 = PI * 2.0f;
-    const float segment = PI_2 / segments;
+    const auto segments = 64;
+    const auto radius = arcball.radius;
+    const auto PI_2 = PI * 2.0f;
+    const auto segment = PI_2 / segments;
 
-    for (float i = 0.0f; i < PI_2; i += segment) {
+    for (auto i = 0.0f; i < PI_2; i += segment) {
         glm::vec3 position(cos(i), sin(i), 0.0f);
-        mesh.positions.data.push_back(position * radius);
+        positions.push_back(position * radius);
     }
 }
 
-void ArcballHelper::fill_arc(gst::Mesh & mesh, glm::vec3 from, glm::vec3 to)
+void ArcballHelper::fill_arc(
+    Arcball const & arcball,
+    std::vector<glm::vec3> & positions,
+    glm::vec3 from,
+    glm::vec3 to)
 {
-    const int arc_bisects = 5;
-    const int arc_segments = 32;
+    const auto arc_bisects = 5;
+    const auto arc_segments = 32;
 
     std::array<glm::vec3, arc_segments + 1> points;
     points[0] = from;
@@ -204,9 +247,9 @@ void ArcballHelper::fill_arc(gst::Mesh & mesh, glm::vec3 from, glm::vec3 to)
         points[1] = bisect(points[0], points[1]);
     }
 
-    const auto radius = arcball->radius;
-    auto push = [&mesh, radius](glm::vec3 point) {
-        mesh.positions.data.push_back(point * radius);
+    const auto radius = arcball.radius;
+    auto push = [&positions, radius](glm::vec3 point) {
+        positions.push_back(point * radius);
     };
 
     push(points[0]);
@@ -220,11 +263,12 @@ void ArcballHelper::fill_arc(gst::Mesh & mesh, glm::vec3 from, glm::vec3 to)
         push(points[i]);
     }
     push(points[arc_segments]);
-
-    mesh.positions.buffer_data(gst::DataUsage::DYNAMIC);
 }
 
-void ArcballHelper::fill_half_arc(gst::Mesh & mesh, glm::vec3 axis)
+void ArcballHelper::fill_half_arc(
+    Arcball const & arcball,
+    std::vector<glm::vec3> & positions,
+    glm::vec3 axis)
 {
     // create a perpendicular vector that is a "mirror" over another axis
     glm::vec3 mirror_point;
@@ -240,8 +284,8 @@ void ArcballHelper::fill_half_arc(gst::Mesh & mesh, glm::vec3 axis)
     auto mid_point = glm::cross(mirror_point, axis);
 
     // "combine" the two half arcs into one arc
-    fill_arc(mesh, mirror_point, mid_point);
-    fill_arc(mesh, mid_point, -mirror_point);
+    fill_arc(arcball, positions, mirror_point, mid_point);
+    fill_arc(arcball, positions, mid_point, -mirror_point);
 }
 
 glm::vec3 ArcballHelper::bisect(glm::vec3 a, glm::vec3 b)

@@ -1,15 +1,11 @@
 #version 130
 
-struct Material {
-    vec3 diffuse;
-};
-
-uniform float opacity;
-uniform Material material;
+uniform vec3 diffuse = vec3(1.0);
+uniform float opacity = 1.0;
 
 out vec4 frag_color;
 
 void main()
 {
-    frag_color = vec4(material.diffuse, opacity);
+    frag_color = vec4(diffuse, opacity);
 }
