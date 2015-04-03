@@ -43,7 +43,7 @@ void Demo::destroy()
 void Demo::create_scene()
 {
     auto camera = std::unique_ptr<gst::Camera>(new gst::PerspectiveCamera(45.0f, render_size, 0.1f, 1000.0f));
-    eye = std::make_shared<gst::CameraNode>(std::move(camera));
+    auto eye = std::make_shared<gst::CameraNode>(std::move(camera));
     eye->rotate_x(-30.0f);
     eye->rotate_y(20.0f);
     eye->translate_z(4.2f);

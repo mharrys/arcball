@@ -24,7 +24,6 @@ private:
 
     gst::Renderer renderer;
     gst::Scene scene;
-    std::shared_ptr<gst::CameraNode> eye;
 
     gst::Resolution render_size;
     gst::ProgramPool programs;
